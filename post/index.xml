@@ -611,8 +611,8 @@ Linux内核处理收到TCP报文的入口函数是 tcp_v4_rcv ，在收到报文
 &lt;li&gt;当没有响应数据要发送时，ACK将会延迟一段时间，以等待是否有由响应的数据可以一起发送&lt;/li&gt;
 &lt;li&gt;如果在延迟等待发送ACK期间，对方的第二个数据报文又到达了，那么就会立刻发送ACK&lt;/li&gt;
 &lt;/ul&gt;
-&lt;p&gt;优雅关闭（shutdown） 和 暴力关闭（close）&lt;/p&gt;
-&lt;ul&gt;
+&lt;h3 id=&#34;优雅关闭shutdown-和-暴力关闭close&#34;&gt;优雅关闭（shutdown） 和 暴力关闭（close）
+&lt;/h3&gt;&lt;ul&gt;
 &lt;li&gt;close()  ， 同时关闭socket的发送和读取方向， 也就是socket 不在有发送和读取的能力，这个时候内核就会像对方发送FIN报文 ，进行四次挥手， 但是如果使多进程/线程的情况向，共享一个socket，这样你 调用了close() 只是将 socket的引用计数-1 ， 并不会导致socket 不可用， 内核也就不会发送FIN 报文，这样不影响其他进程的读写操作，知道引用计数变为0 ，才发送FIN报文。&lt;/li&gt;
 &lt;li&gt;shutdown() ，可以指定socket以那种发生进行关闭，如果使关闭发送方向，那么socket就没有了发送能力，但是还有接收数据的能力，如果使多线程/进程，共享一个socket，shutdown也不会管引用计数，直接就导致socket不可以用了  ，然后发送FIN报文，别的进程也用不了。&lt;/li&gt;
 &lt;li&gt;SHUT_RD：关闭接收通道，不能再从这个套接字接收数据&lt;/li&gt;
