@@ -47,6 +47,30 @@
         <guid>https://L-Y-D-0129.github.io/categories/stl/</guid>
         <description></description>
         </item>
+        <item>
+        <title>HTTP</title>
+        <link>https://L-Y-D-0129.github.io/categories/http/</link>
+        <pubDate>Tue, 17 Jan 2023 00:00:00 +0000</pubDate>
+        
+        <guid>https://L-Y-D-0129.github.io/categories/http/</guid>
+        <description></description>
+        </item>
+        <item>
+        <title>IP</title>
+        <link>https://L-Y-D-0129.github.io/categories/ip/</link>
+        <pubDate>Tue, 17 Jan 2023 00:00:00 +0000</pubDate>
+        
+        <guid>https://L-Y-D-0129.github.io/categories/ip/</guid>
+        <description></description>
+        </item>
+        <item>
+        <title>TCP</title>
+        <link>https://L-Y-D-0129.github.io/categories/tcp/</link>
+        <pubDate>Tue, 17 Jan 2023 00:00:00 +0000</pubDate>
+        
+        <guid>https://L-Y-D-0129.github.io/categories/tcp/</guid>
+        <description></description>
+        </item>
         
     </channel>
 </rss>
