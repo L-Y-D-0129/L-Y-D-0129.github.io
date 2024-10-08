@@ -268,18 +268,8 @@
 &lt;h4 id=&#34;电话姓名排序&#34;&gt;电话、姓名排序
 &lt;/h4&gt;&lt;p&gt;使用有序集合的ZRANGEBYLEX或ZREVRANGEBYLEX可以帮助我们实现电话号码或姓名的排序，我们以(返回指定成员区间内的成员，按 key 正序排列，分数必须相同)为例。ZRANGEBYLEX&lt;/p&gt;
 &lt;p&gt;&lt;strong&gt;注意:不要在分数不一致的 SortSet 集合中去使用 ZRANGEBYLEX和 ZREVRANGEBYLEX 指令，因为获取的结果会不准确。&lt;/strong&gt;&lt;/p&gt;
-&lt;h1 id=&#34;redis数据结构&#34;&gt;Redis数据结构
-&lt;/h1&gt;&lt;p&gt;这里主要讲解Redis键值对中值的数据类型，也就是数据的保存形式，其底层实现的方式的数据结构。&lt;/p&gt;
-&lt;p&gt;&lt;img src=&#34;https://L-Y-D-0129.github.io/image/%e6%95%b0%e6%8d%ae%e7%bb%93%e6%9e%84%e5%af%b9%e5%ba%94%e5%9b%be.png&#34;
-	
-	
-	
-	loading=&#34;lazy&#34;
-	
-		alt=&#34;数据结构对应图&#34;
-	
-	
-&gt;&lt;/p&gt;
+&lt;h2 id=&#34;redis数据结构&#34;&gt;Redis数据结构
+&lt;/h2&gt;&lt;p&gt;这里主要讲解Redis键值对中值的数据类型，也就是数据的保存形式，其底层实现的方式的数据结构。&lt;/p&gt;
 &lt;h2 id=&#34;键值对数据库是怎么实现的&#34;&gt;键值对数据库是怎么实现的？
 &lt;/h2&gt;&lt;p&gt;Redis 是怎样实现键值对(key-value)数据库的。&lt;/p&gt;
 &lt;p&gt;Redis 的键值对中的 key 就是字符串对象，而 &lt;strong&gt;value 可以是字符串对象，也可以是集合数据类型的对象&lt;/strong&gt;&lt;/p&gt;

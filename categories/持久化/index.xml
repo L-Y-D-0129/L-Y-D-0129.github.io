@@ -1,0 +1,896 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>持久化 on 刘煜鼎de学习日记</title>
+        <link>https://L-Y-D-0129.github.io/categories/%E6%8C%81%E4%B9%85%E5%8C%96/</link>
+        <description>Recent content in 持久化 on 刘煜鼎de学习日记</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>zh-cn</language>
+        <copyright>刘煜鼎</copyright>
+        <lastBuildDate>Sun, 21 Jan 2024 00:00:00 +0000</lastBuildDate><atom:link href="https://L-Y-D-0129.github.io/categories/%E6%8C%81%E4%B9%85%E5%8C%96/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>Redis</title>
+        <link>https://L-Y-D-0129.github.io/p/redis/</link>
+        <pubDate>Sun, 21 Jan 2024 00:00:00 +0000</pubDate>
+        
+        <guid>https://L-Y-D-0129.github.io/p/redis/</guid>
+        <description>&lt;img src="https://L-Y-D-0129.github.io/p/redis/2109242356423Y8-0-lp.jpg" alt="Featured image of post Redis" /&gt;&lt;h1 id=&#34;前言&#34;&gt;前言
+&lt;/h1&gt;&lt;blockquote&gt;
+&lt;p&gt;Hello，各位好，我是刘煜鼎！&lt;/p&gt;
+&lt;p&gt;这篇文档集合了一些Redis知识&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;主要为数据结构、持久化、集群、缓存等相关知识。&lt;/p&gt;
+&lt;h1 id=&#34;redis常见数据类型和应用场景&#34;&gt;Redis常见数据类型和应用场景
+&lt;/h1&gt;&lt;p&gt;Redis中常见的数据类型有五种：&lt;strong&gt;String（字符串），Hash（哈希），List（列表），Set（集合），Zset（有序集合）。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;随着Redis版本的更新，后面又支持了四种数据类型：&lt;strong&gt;BitMap（2.2 版新增）、HyperLogLog（2.8 版新增）、GEO（3.2 版新增）、Stream（5.0 版新增）。&lt;/strong&gt;&lt;/p&gt;
+&lt;h2 id=&#34;string&#34;&gt;String
+&lt;/h2&gt;&lt;h3 id=&#34;介绍&#34;&gt;介绍
+&lt;/h3&gt;&lt;p&gt;String 是最基本的 key-value 结构，key 是唯一标识，value 是具体的值，value其实不仅是字符串，也可以是数字(整数或浮点数)，value 最多可以容纳的数据长度是512M。&lt;/p&gt;
+&lt;h3 id=&#34;内部实现&#34;&gt;内部实现
+&lt;/h3&gt;&lt;p&gt;String类型的底层的数据结构实现主要是int和SDS（简单动态字符串）。&lt;/p&gt;
+&lt;p&gt;SDS相比于C的原生字符串：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;**SDS 不仅可以保存文本数据，还可以保存二进制数据。**因为SDS使用 len 属性的值而不是空字符来判断字符串是否结束，并且 SDS 的所有 API 都会以处理二进制的方式来处理 SDS 存放在 buf[]数组里的数据。所以 SDS 不光能存放文本数据，而且能保存图片、音频、视频、压缩文件这样的二进制数据。&lt;/li&gt;
+&lt;li&gt;**SDS 获取字符串长度的时间复杂度是 O(1)。**因为C语言的字符串并不记录自身长度，所以获取长度的复杂度为 O(n);而 SDS 结构里用 len 属性记录了字符串长度，所以复杂度为 O(1)。&lt;/li&gt;
+&lt;li&gt;Redis 的 SDS API 是安全的，拼接字符串不会造成缓冲区溢出。因为 SDS 在拼接字符串之前会检查SDS 空间是否满足要求，如果空间不够会自动扩容，所以不会导致缓冲区溢出的问题。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;字符串的内部编码（encoding）有三种：int、raw和embstr（raw和embstr为SDS（简单动态字符串））。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;如果一个字符串对象保存的是整数值，并且这个整数值可以用 long类型来表示，那么字符串对象会将整数值保存在字符串对象结构的 ptr 属性里面(将 void*转换成 long)，并将字符串对象的编码设置为int 。&lt;/p&gt;
+&lt;p&gt;如果字符串对象保存的是一个字符串则有两种情况：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;字符串长度小于等于32字节（redis2.+版本）
+字符串对象将使用一个简单动态字符串(SDS)来保存这个字符串，并将对象的编码设置为 embstr，embstr 编码是专门用于保存短字符串的一种优化编码方式。&lt;/li&gt;
+&lt;li&gt;字符串长度大于32字节（redis2.+版本）
+那么字符串对象将使用一个简单动态字符串(SDS)来保存这个字符串，并将对象的编码设置为 raw。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;可以看到 embstr 和 raw 编码都会使用 SDS 来保存值，但&lt;strong&gt;不同之处在于&lt;/strong&gt; embstr 会通过&lt;strong&gt;一次内存分配&lt;/strong&gt;函数来分配一块连续的内存空间来保存 redisobiect 和 SDS ，而 raw 编码会通过调用&lt;strong&gt;两次内存分配&lt;/strong&gt;函数来分别分配两块空间来保存 redisobject 和 SDS 。Redis这样做会有很多好处:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;embstr 编码将创建字符串对象所需的内存分配次数从 raw编码的两次降低为一次;&lt;/li&gt;
+&lt;li&gt;释放 embstr 编码的字符串对象同样只需要调用一次内存释放函数;&lt;/li&gt;
+&lt;li&gt;因为 embstr 编码的字符串对象的所有数据都保存在一块连续的内存里面可以更好的利用 CPU 缓存提升性能。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但是 embstr 也有缺点的:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果字符串的长度增加需要重新分配内存时，整个redisObject和sds都需要重新分配空间，所以&lt;strong&gt;embstr编码的字符串对象实际上是只读的&lt;/strong&gt;，redis没有为embstr编码的字符串对象编写任何相应的修改程序。当我们对embstr编码的字符串对象执行任何修改命令(例如append)时，程序会先将&lt;strong&gt;对象的编码从embstr转换成raw&lt;/strong&gt;，然后再执行修改命令。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;常用操作&#34;&gt;常用操作
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;set：设置字符串&lt;/li&gt;
+&lt;li&gt;get：读取字符串&lt;/li&gt;
+&lt;li&gt;incr：自增（1）&lt;/li&gt;
+&lt;li&gt;decr：自减（1）&lt;/li&gt;
+&lt;li&gt;exists：判断某个key是否存在&lt;/li&gt;
+&lt;li&gt;strlen：返回字符串长度&lt;/li&gt;
+&lt;li&gt;del：删除key&lt;/li&gt;
+&lt;li&gt;expire：设置过期时间&lt;/li&gt;
+&lt;li&gt;ttl：查看剩余过期时间&lt;/li&gt;
+&lt;li&gt;set nx：不存在就插入（成功返回1，失败返回0）&lt;/li&gt;
+&lt;li&gt;mset：批量设置字符串&lt;/li&gt;
+&lt;li&gt;mget：批量读取字符串&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;应用场景&#34;&gt;应用场景
+&lt;/h3&gt;&lt;h4 id=&#34;缓存对象&#34;&gt;缓存对象
+&lt;/h4&gt;&lt;p&gt;使用 String 来缓存对象有两种方式:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;直接缓存整个对象的JSON，命令例子:SET user:1&amp;rsquo;{&amp;ldquo;name&amp;rdquo;:&amp;ldquo;隔壁老王&amp;rdquo;，“age”:38}&#39;&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;采用将 key 进行分离为 user:ID:属性，采用 MSET存储，用 MGET获取各属性值，&lt;/p&gt;
+&lt;p&gt;命令例子:&lt;/p&gt;
+&lt;p&gt;MSET  user:1:name &amp;ldquo;隔壁老王头&amp;rdquo; user:1:age 38&lt;/p&gt;
+&lt;p&gt;​			 user:2:name &amp;ldquo;楼下老吴头&amp;rdquo; user:2:age 40&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id=&#34;常规计数&#34;&gt;常规计数
+&lt;/h4&gt;&lt;p&gt;因为 Redis 处理命令是单线程，所以执行命令的过程是原子的。因此 String 数据类型适合计数场景，比如计算访问次数、点赞、转发、库存数量等等。&lt;/p&gt;
+&lt;h4 id=&#34;分布式锁&#34;&gt;分布式锁
+&lt;/h4&gt;&lt;p&gt;SET 命令有个 NX 参数可以实现「key不存在才插入」，可以用它来实现分布式锁&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果 key 不存在，则显示插入成功，可以用来表示加锁成功;&lt;/li&gt;
+&lt;li&gt;如果 key 存在，则会显示插入失败，可以用来表示加锁失败。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id=&#34;共享session信息&#34;&gt;共享session信息
+&lt;/h4&gt;&lt;p&gt;通常我们在开发后台管理系统时，会使用 Session 来保存用户的会话(登录)状态，这些 Session 信息会被保存在服务器端，但这只适用于单系统应用，如果是分布式系统此模式将不再适用。&lt;/p&gt;
+&lt;p&gt;例如用户一的 Session 信息被存储在服务器一，但第二次访问时用户一被分配到服务器二，这个时候服务器并没有用户一的 Session 信息，就会出现需要重复登录的问题，问题在于分布式系统每次会把请求随机分配到不同的服务器。&lt;/p&gt;
+&lt;p&gt;因此，我们需要借助 Redis 对这些 Session 信息进行统一的存储和管理，这样无论请求发送到那台服务器，服务器都会去同一个 Redis 获取相关的 Session 信息，这样就解决了分布式系统下 Session 存储的问题。&lt;/p&gt;
+&lt;h2 id=&#34;list&#34;&gt;List
+&lt;/h2&gt;&lt;h3 id=&#34;介绍-1&#34;&gt;介绍
+&lt;/h3&gt;&lt;p&gt;List列表是最简单的字符串列表，按照插入顺序排序，可以从头部或尾部向List列表添加元素。&lt;/p&gt;
+&lt;p&gt;列表的最大长度为2^32 - 1，即每个列表支持超过40亿个元素。&lt;/p&gt;
+&lt;h3 id=&#34;内部实现-1&#34;&gt;内部实现
+&lt;/h3&gt;&lt;p&gt;类型的底层数据结构是由&lt;strong&gt;双向链表或压缩列表&lt;/strong&gt;实现的:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果列表的元素个数小于 512个，列表每个元素的值都小于 64 字节，Redis 会使用&lt;strong&gt;压缩列表&lt;/strong&gt;作为List 类型的底层数据结构;&lt;/li&gt;
+&lt;li&gt;如果列表的元素不满足上面的条件，Redis 会使用&lt;strong&gt;双向链表&lt;/strong&gt;作为 List 类型的底层数据结构;&lt;/li&gt;
+&lt;li&gt;但是&lt;strong&gt;在 Redis 3.2 版本之后，List 数据类型底层数据结构就只由 quicklist （二者结合）实现了，替代了双向链表和压缩列表。&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;常用操作-1&#34;&gt;常用操作
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;lpush：在list左侧插入一个新元素&lt;/li&gt;
+&lt;li&gt;rpush：在list右侧插入一个新元素&lt;/li&gt;
+&lt;li&gt;lrange：从list中指定一个范围来提取元素&lt;/li&gt;
+&lt;li&gt;lpop：移除并返回列表头元素&lt;/li&gt;
+&lt;li&gt;rpop：移除并返回列表尾元素&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;应用场景-1&#34;&gt;应用场景
+&lt;/h3&gt;&lt;h4 id=&#34;消息队列&#34;&gt;消息队列
+&lt;/h4&gt;&lt;p&gt;消息队列在存取消息时，必须要满足三个需求，分别是&lt;strong&gt;消息保序、处理重复的消息和保证消息可靠性&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;Redis 的 List 和 Stream 两种数据类型，就可以满足消息队列的这三个需求。&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;如何满足消息保序需求？&lt;/p&gt;
+&lt;p&gt;List 本身就是按先进先出的顺序对数据进行存取的，所以，如果使用 List 作为消息队列保存消息的话，就已经能满足消息保序的需求了。&lt;/p&gt;
+&lt;p&gt;List 可以使用 LPUSH+RPOP(或者反过来，RPUSH+LPOP)命令实现消息队列。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;生产者使用 LPUSH key value[value&amp;hellip;]将消息插入到队列的头部，如果 key 不存在则会创建一个空的队列再插入消息。&lt;/li&gt;
+&lt;li&gt;消费者使用 RPOP key 依次读取队列的消息，先进先出。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;潜在性能风险点：&lt;/p&gt;
+&lt;p&gt;在生产者往 List 中写入数据时，List 并不会主动地通知消费者有新消息写入，如果消费者想要及时处理消息，就需要在程序中不停地调用 RPOP命令(比如使用一个while(1)循环)。如果有新消息写入，RPOP命令就会返回结果，否则，RPOP命令返回空值，再继续循环，&lt;/p&gt;
+&lt;p&gt;所以，即使没有新消息写入List，消费者也要不停地调用 RPOP 命令，这就会导致消费者程序的 &lt;strong&gt;CPU 一直消耗在执行 RPOP 命令上，带来不必要的性能损失。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;为了解决这个问题，Redis提供了 BRPOP 命令。BRPOP命令也称为阻塞式读取，客户端在没有读到队列数据时，自动阻塞，直到有新的数据写入队列，再开始读取新数据。和消费者程序自己不停地调用RPOP命令相比，这种方式能节省CPU开销。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如何处理重复的消息？&lt;/p&gt;
+&lt;p&gt;消费者要实现重复消息的判断，需要2个方面的要求:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;每个消息都有一个全局的ID。&lt;/li&gt;
+&lt;li&gt;消费者要记录已经处理过的消息的ID。当收到一条消息后，消费者程序就可以对比收到的消息 ID 和记录的已处理过的消息 ID，来判断当前收到的消息有没有经过处理。如果已经处理过，那么，消费者程序就不再进行处理了。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;但是 &lt;strong&gt;List 并不会为每个消息生成 ID 号，所以我们需要自行为每个消息生成一个全局唯一ID&lt;/strong&gt;，生成之后我们在用 LPUSH 命令把消息插入 List 时，需要在消息中包含这个全局唯一 ID。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;如何保证消息的可靠性？&lt;/p&gt;
+&lt;p&gt;当消费者程序从 List 中读取一条消息后，List 就不会再留存这条消息了。所以，如果消费者程序在处理消息的过程出现了故障或宕机，就会导致消息没有处理完成，那么，消费者程序再次启动后，就没法再次从List 中读取消息了。&lt;/p&gt;
+&lt;p&gt;为了留存消息，List类型提供了 BRPOPLPUSH 命令，这个命令&lt;strong&gt;的作用是让消费者程序从一个 List 中读取消息，同时，Redis 会把这个消息再插入到另一个 List(可以叫作备份 List)留存&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;这样一来，如果消费者程序读了消息但没能正常处理，等它重启后，就可以从备份 List 中重新读取消息并进行处理了。&lt;/p&gt;
+&lt;h5 id=&#34;总结&#34;&gt;总结
+&lt;/h5&gt;&lt;p&gt;基于 List 类型的消息队列，满足消息队列的三大需求(消息保序、处理重复的消息和保证消息可靠性)。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;消息保序:使用 LPUSH+RPOP;&lt;/li&gt;
+&lt;li&gt;阻塞读取:使用 BRPOP;&lt;/li&gt;
+&lt;li&gt;重复消息处理:生产者自行实现全局唯- ID;&lt;/li&gt;
+&lt;li&gt;消息的可靠性:使用 BRPOPLPUSH&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h5 id=&#34;list做消息队列的缺陷&#34;&gt;List做消息队列的缺陷
+&lt;/h5&gt;&lt;p&gt;&lt;strong&gt;List 不支持多个消费者消费同一条消息&lt;/strong&gt;，因为一旦消费者拉取一条消息后，这条消息就从 List 中删除了无法被其它消费者再次消费。&lt;/p&gt;
+&lt;p&gt;要实现一条消息可以被多个消费者消费，那么就要将多个消费者组成一个消费组，使得多个消费者可以消费同一条消息，但是 &lt;strong&gt;List 类型并不支持消费组的实现&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;这就要说起 Redis 从 5.0 版本开始提供的 Stream 数据类型了，Stream 同样能够满足消息队列的三大需求，而且它还支持「消费组」形式的消息读取。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;hash&#34;&gt;Hash
+&lt;/h2&gt;&lt;h3 id=&#34;介绍-2&#34;&gt;介绍
+&lt;/h3&gt;&lt;p&gt;Hash 是一个键值对(key-value)集合，其中 value 的形式如:value=[{field1,value1},&amp;hellip;{fieldN,valueN}]。Hash 特别适合用于存储对象。&lt;/p&gt;
+&lt;h3 id=&#34;内部实现-2&#34;&gt;内部实现
+&lt;/h3&gt;&lt;p&gt;Hash 类型的底层数据结构是由&lt;strong&gt;压缩列表或哈希表&lt;/strong&gt;实现的:&lt;/p&gt;
+&lt;p&gt;如果哈希类型元素个数小于 512 个，所有值小于64 字节的话，Redis 会使用&lt;strong&gt;压缩列表&lt;/strong&gt;作为 Hash 类型的底层数据结构;&lt;/p&gt;
+&lt;p&gt;如果哈希类型元素不满足上面条件，Redis 会使用&lt;strong&gt;哈希表&lt;/strong&gt;作为 Hash 类型的 底层数据结构,&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;在 Redis 7.0 中，压缩列表数据结构已经废弃了，交由 listpack 数据结构来实现了。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;常用操作-2&#34;&gt;常用操作
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;hset key field value:指定一个 key，设置字段名所对应的值&lt;/li&gt;
+&lt;li&gt;hget key field:获取指定 key 和字段对应的值(也可以批量添加)，成功返回操作成功的字段数量&lt;/li&gt;
+&lt;li&gt;hmset key field value [field value&amp;hellip;]:批量设置某个 key 的字段和对应值，成功返回 OKhmget key filed [filed&amp;hellip;]:批量返回某个 key 中指定的字段和其对应值&lt;/li&gt;
+&lt;li&gt;hgetall key:用于返回一个 hash 中全部的字段和值&lt;/li&gt;
+&lt;li&gt;hexists key field:是否存在某个字段&lt;/li&gt;
+&lt;li&gt;hdel key field:删除 key 中的字段，可以删除所有字段，如果删除所有字段，相当于删除了这个 key&lt;/li&gt;
+&lt;li&gt;hincrby key filed n:增减操作，hash 中没有类似 decrby 的命令，如果想要减值就直接用负数&lt;/li&gt;
+&lt;li&gt;hkeys key:获取所有的字段值&lt;/li&gt;
+&lt;li&gt;hvals key:获取所有的值&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;应用场景-2&#34;&gt;应用场景
+&lt;/h3&gt;&lt;h4 id=&#34;缓存对象-1&#34;&gt;缓存对象
+&lt;/h4&gt;&lt;p&gt;Hash 类型的(key，field， value)的结构与对象的(对象id，属性，值)的结构相似，也可以用来存储对象。&lt;/p&gt;
+&lt;p&gt;在介绍 String 类型的应用场景时有所介绍，String +Json也是存储对象的一种方式，那么存储对象时，到底用 String + json 还是用 Hash 呢?&lt;/p&gt;
+&lt;p&gt;一般对象用 String +Json 存储，对象中某些频繁变化的属性可以考虑抽出来用 Hash 类型存储。&lt;/p&gt;
+&lt;h4 id=&#34;购物车&#34;&gt;购物车
+&lt;/h4&gt;&lt;p&gt;以用户 id 为 key，商品 id 为 field，商品数量为 value，恰好构成了购物车的3个要素。&lt;/p&gt;
+&lt;p&gt;涉及的命令如下:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;添加商品:HSET cart:{用户id}{商品id} 1&lt;/li&gt;
+&lt;li&gt;添加数量:HINCRBY cart:f用户id}{商品id} 1&lt;/li&gt;
+&lt;li&gt;商品总数:HLEN cart:{用户id}&lt;/li&gt;
+&lt;li&gt;删除商品:HDEL cart:{用户id}{商品id}&lt;/li&gt;
+&lt;li&gt;获取购物车所有商品: HGETALL cart:{用户id}&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;当前仅仅是将商品ID存储到了Redis 中，在回显商品具体信息的时候，还需要拿着商品 id 查询一次数据库，获取完整的商品的信息。&lt;/p&gt;
+&lt;h2 id=&#34;set&#34;&gt;Set
+&lt;/h2&gt;&lt;h3 id=&#34;介绍-3&#34;&gt;介绍
+&lt;/h3&gt;&lt;p&gt;Set 类型是一个无序并唯一的键值集合，它的存储顺序不会按照插入的先后顺序进行存储。&lt;/p&gt;
+&lt;p&gt;一个集合最多可以存储 2^32-1 个元素。概念和数学中个的集合基本类似，可以交集，并集，差集等等，所以 Set 类型除了支持集合内的增删改查，同时还支持多个集合取交集、并集、差集。&lt;/p&gt;
+&lt;p&gt;Set 类型和 List 类型的区别如下:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;List 可以存储重复元素，Set 只能存储非重复元素;&lt;/li&gt;
+&lt;li&gt;List 是按照元素的先后顺序存储元素的，而 Set 则是无序方式存储元素的。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;内部实现-3&#34;&gt;内部实现
+&lt;/h3&gt;&lt;p&gt;Set 类型的底层数据结构是由&lt;strong&gt;哈希表或整数集合&lt;/strong&gt;实现的：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果集合中的元素都是整数且元素个数小于 512个，Redis 会使用&lt;strong&gt;整数集合&lt;/strong&gt;作为 Set 类型的底层数据结构;&lt;/li&gt;
+&lt;li&gt;如果集合中的元素不满足上面条件，则 Redis 使用&lt;strong&gt;哈希表&lt;/strong&gt;作为 Set 类型的底层数据结构。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;常用操作-3&#34;&gt;常用操作
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;sadd:添加新元素，元素存在则忽略，key不存在则新建&lt;/li&gt;
+&lt;li&gt;smembers:列出集合中所有元素&lt;/li&gt;
+&lt;li&gt;sismember:判断元素是否在集合中&lt;/li&gt;
+&lt;li&gt;scard:返回集合中元素个数&lt;/li&gt;
+&lt;li&gt;srem:移除集合中一个或多个元素，如果移除的不存在就不处理&lt;/li&gt;
+&lt;li&gt;sinter:对两个集合求交集&lt;/li&gt;
+&lt;li&gt;sunion:对两个集合求并集&lt;/li&gt;
+&lt;li&gt;sdiff:对两个集合求差集&lt;/li&gt;
+&lt;li&gt;setnx:向 Redis 中添加一个 key，只用当 key 不存在的时候才添加并返回 1，存在则不添加返回 0&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;应用场景-3&#34;&gt;应用场景
+&lt;/h3&gt;&lt;p&gt;集合的主要几个特性，无序、不可重复、支持并交差等操作。&lt;/p&gt;
+&lt;p&gt;因此 Set 类型比较适合用来数据去重和保障数据的唯一性，还可以用来统计多个集合的交集、错集和并集等，当我们存储的数据是无序并且需要去重的情况下，比较适合使用集合类型进行存储。&lt;/p&gt;
+&lt;p&gt;但是这里有一个潜在的风险。&lt;strong&gt;Set 的差集、并集和交集的计算复杂度较高，在数据量较大的情况下，如果直接执行这些计算，会导致 Redis 实例阻塞。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;在主从集群中，为了避免主库因为 Set 做聚合计算(交集、差集、并集)时导致主库被阻塞，我们可以选择一个从库完成聚合统计，或者把数据返回给客户端，由客户端来完成聚合统计。&lt;/p&gt;
+&lt;h4 id=&#34;点赞&#34;&gt;点赞
+&lt;/h4&gt;&lt;p&gt;Set 类型可以保证一个用户只能点一个赞。&lt;/p&gt;
+&lt;p&gt;key 是文章id，value 是用户id&lt;/p&gt;
+&lt;h4 id=&#34;共同关注&#34;&gt;共同关注
+&lt;/h4&gt;&lt;p&gt;Set 类型支持交集运算，所以可以用来计算共同关注的好友、公众号等。&lt;/p&gt;
+&lt;p&gt;key 可以是用户id，value 则是已关注的公众号的id。&lt;/p&gt;
+&lt;h4 id=&#34;抽奖活动&#34;&gt;抽奖活动
+&lt;/h4&gt;&lt;p&gt;存储某活动中中奖的用户名 ，Set 类型因为有去重功能，可以保证同一个用户不会中奖两次。&lt;/p&gt;
+&lt;h2 id=&#34;zset&#34;&gt;Zset
+&lt;/h2&gt;&lt;h3 id=&#34;介绍-4&#34;&gt;介绍
+&lt;/h3&gt;&lt;p&gt;Zset 类型(有序集合类型)相比于 Set 类型多了一个排序属性 score(分值)，对于有序集合 ZSet 来说每个存储元素相当于有两个值组成的，一个是有集合的元素值，一个是排序值。&lt;/p&gt;
+&lt;p&gt;有序集合保留了集合不能有重复成员的特性(分值可以重复)，但不同的是，有序集合中的元素可以排序。&lt;/p&gt;
+&lt;h3 id=&#34;内部实现-4&#34;&gt;内部实现
+&lt;/h3&gt;&lt;p&gt;Zset 类型的底层数据结构是由&lt;strong&gt;压缩列表或跳表&lt;/strong&gt;实现的:&lt;/p&gt;
+&lt;p&gt;如果有序集合的元素个数小于 128个，并且每个元素的值小于 64字节时，Redis 会使用&lt;strong&gt;压缩列表&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;作为 Zset 类型的底层数据结构:&lt;/p&gt;
+&lt;p&gt;如果有序集合的元素不满足上面的条件，Redis 会使用&lt;strong&gt;跳表&lt;/strong&gt;作为 Zset 类型的底层数据结构;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;在 Redis 7.0 中，压缩列表数据结构已经废弃了，交由 listpack 数据结构来实现了。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;常用操作-4&#34;&gt;常用操作
+&lt;/h3&gt;&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;zadd:新增一个有序集合，并加入一个元素&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;zrange:列出有序集合中的元素&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;zrem:从有序集合中删除元素&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;zcard:返回有序集合中的数量&lt;/p&gt;
+&lt;p&gt;注意：相比于Set类型，Zset类型没有支持差集运算&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;应用场景-4&#34;&gt;应用场景
+&lt;/h3&gt;&lt;p&gt;Zset 类型(Sorted Set，有序集合)可以根据元素的权重来排序，我们可以自己来决定每个元素的权重值。比如说，我们可以根据元素插入 Sorted set 的时间确定权重值，先插入的元素权重小，后插入的元素权重大。&lt;/p&gt;
+&lt;p&gt;在面对需要展示最新列表、排行榜等场景时，如果数据更新频繁或者需要分页显示，可以优先考虑使用Sorted Set.&lt;/p&gt;
+&lt;h4 id=&#34;排行榜&#34;&gt;排行榜
+&lt;/h4&gt;&lt;p&gt;有序集合比较典型的使用场景就是排行榜。例如学生成绩的排名榜、游戏积分排行榜、视频播放排名、电商系统中商品的销量排名等。&lt;/p&gt;
+&lt;h4 id=&#34;电话姓名排序&#34;&gt;电话、姓名排序
+&lt;/h4&gt;&lt;p&gt;使用有序集合的ZRANGEBYLEX或ZREVRANGEBYLEX可以帮助我们实现电话号码或姓名的排序，我们以(返回指定成员区间内的成员，按 key 正序排列，分数必须相同)为例。ZRANGEBYLEX&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;注意:不要在分数不一致的 SortSet 集合中去使用 ZRANGEBYLEX和 ZREVRANGEBYLEX 指令，因为获取的结果会不准确。&lt;/strong&gt;&lt;/p&gt;
+&lt;h2 id=&#34;redis数据结构&#34;&gt;Redis数据结构
+&lt;/h2&gt;&lt;p&gt;这里主要讲解Redis键值对中值的数据类型，也就是数据的保存形式，其底层实现的方式的数据结构。&lt;/p&gt;
+&lt;h2 id=&#34;键值对数据库是怎么实现的&#34;&gt;键值对数据库是怎么实现的？
+&lt;/h2&gt;&lt;p&gt;Redis 是怎样实现键值对(key-value)数据库的。&lt;/p&gt;
+&lt;p&gt;Redis 的键值对中的 key 就是字符串对象，而 &lt;strong&gt;value 可以是字符串对象，也可以是集合数据类型的对象&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;比如 List 对象、Hash 对象、Set 对象和 Zset 对象。&lt;/p&gt;
+&lt;p&gt;举个例子：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&amp;gt; SET name &amp;#34; 隔壁老王&amp;#34;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;OK
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&amp;gt; HSET person name &amp;#34;楼下老吴&amp;#34; age 18
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;0
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&amp;gt; RPUSH stu &amp;#34;小帅&amp;#34; &amp;#34;小美&amp;#34;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;(integer) 4
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;这些命令代表着:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;第一条命令:name 是一个&lt;strong&gt;字符串键&lt;/strong&gt;，因为键的&lt;strong&gt;值是一个字符串对象&lt;/strong&gt;;&lt;/li&gt;
+&lt;li&gt;第二条命令:person 是一个&lt;strong&gt;哈希表键&lt;/strong&gt;，因为键的&lt;strong&gt;值是一个包含两个键值对的哈希表对象&lt;/strong&gt;,&lt;/li&gt;
+&lt;li&gt;第三条命令:stu 是一个&lt;strong&gt;列表键&lt;/strong&gt;，因为键的&lt;strong&gt;值是一个包含两个元素的列表对象&lt;/strong&gt;;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些键值对是如何保存在 Redis 中的呢?&lt;/p&gt;
+&lt;p&gt;Redis 是使用了一个「哈希表」保存所有键值对，哈希表的最大好处就是让我们可以用 O(1) 的时间复杂度来快速查找到键值对。哈希表其实就是一个数组，数组中的元素叫做哈希桶。&lt;/p&gt;
+&lt;p&gt;Redis 的哈希桶是怎么保存键值对数据的呢?&lt;/p&gt;
+&lt;p&gt;哈希桶存放的是指向键值对数据的指针(dictEntry&amp;quot;&lt;em&gt;)，这样通过指针就能找到键值对数据，然后因为键值对的值可以保存字符串对象和集合数据类型的对象，所以键值对的数据结构中并不是直接保存值本身而是保存了 void * key 和 void&lt;/em&gt;value 指针，分别指向了实际的键对象和值对象，这样一来，即使值是集合数据，也可以通过 void * value 指针找到。&lt;/p&gt;
+&lt;p&gt;Redis 保存键值对所涉及到的数据结构&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://L-Y-D-0129.github.io/image/%e4%bf%9d%e5%ad%98%e9%94%ae%e5%80%bc%e5%af%b9%e6%b6%89%e5%8f%8a%e5%88%b0%e7%9a%84%e6%95%b0%e6%8d%ae%e7%bb%93%e6%9e%84.png&#34;
+	
+	
+	
+	loading=&#34;lazy&#34;
+	
+	
+&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;redisDb 结构，表示 Redis 数据库的结构，结构体里存放了指向了 dict 结构的指针;&lt;/li&gt;
+&lt;li&gt;dict 结构，结构体里存放了2个哈希表，正常情况下都是用「哈希表1」，「哈希表2」只有在 rehash的时候才用;&lt;/li&gt;
+&lt;li&gt;ditctht 结构，表示哈希表的结构，结构里存放了哈希表数组，数组中的每个元素都是指向一个哈希表节点结构(dictEntry)的指针;&lt;/li&gt;
+&lt;li&gt;dictEntry 结构，表示哈希表节点的结构，结构里存放了 **void&lt;em&gt;key 和 void&lt;/em&gt;value 指针， &lt;strong&gt;key 指向的是 String 对象，而 value 则可以指向 String 对象，也可以指向集合类型的对象，比如 List 对象、Hash对象、Set 对象和 Zset 对象&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;特别说明下，void&lt;em&gt;key 和 void&lt;/em&gt;value 指针指向的是 &lt;strong&gt;Redis 对象&lt;/strong&gt;，Redis 中的每个对象都由 redisObject结构表示。&lt;/p&gt;
+&lt;p&gt;对象结构里包含的成员变量:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;type，标识该对象是什么类型的对象(String 对象、 List 对象、Hash 对象、Set对象和 Zset 对象);&lt;/li&gt;
+&lt;li&gt;encoding，标识该对象使用了哪种底层的数据结构;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;ptr，指问底层数据结构的指针，&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Redis 键值对数据库的全景图&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://L-Y-D-0129.github.io/image/%e5%85%a8%e6%99%af%e5%9b%be.png&#34;
+	
+	
+	
+	loading=&#34;lazy&#34;
+	
+	
+&gt;&lt;/p&gt;
+&lt;h2 id=&#34;sds&#34;&gt;SDS
+&lt;/h2&gt;&lt;p&gt;Redis 的String 数据类型的底层数据结构是 SDS。&lt;/p&gt;
+&lt;p&gt;之所以设计SDS结构来表示字符串是因为C语言的char*字符数组有以下缺陷：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;char*指针只是指向字符数组的起始位置，而&lt;strong&gt;字符数组的结尾位置就是用&amp;quot;\0&amp;quot;表示，意思是指字符串的结束&lt;/strong&gt;。因此&lt;strong&gt;C语言获取字符串长度的时间复杂度是O(N)（这是一个可以改进的地方）&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;字符串里面不能含有“\0”字符&lt;/strong&gt;，否则最先被程序读入的“\0”字符将被误认为是字符串结尾，这个限制使得C语言的字符串只能保存文本数据，&lt;strong&gt;不能保存像图片、音频、视频文化这样的二进制数据(这也是一个可以改进的地方)&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;C语言的字符串是不会记录自身的缓冲区大小的&lt;/strong&gt;，所以 strcat 函数假定程序员在执行这个函数时，已经为dest 分配了足够多的内存，可以容纳 src 字符串中的所有内容，而&lt;strong&gt;一旦这个假定不成立，就会发生缓冲区溢出将可能会造成程序运行终止，(这是一个可以改进的地方)&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Redis实现的SDS结构可以将上述问题解决。&lt;/p&gt;
+&lt;h3 id=&#34;sds结构设计&#34;&gt;SDS结构设计
+&lt;/h3&gt;&lt;p&gt;结构中的每个成员变量分别介绍下:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;len，记录了字符串长度&lt;/strong&gt;。这样获取字符串长度的时候，只需要返回这个成员变量值就行，时间复杂度只需要 O(1)。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;alloc，分配给字符数组的空间长度&lt;/strong&gt;。这样在修改字符串的时候，可以通过a11oc-len 计算出剩余的空间大小，可以用来判断空间是否满足修改需求，如果不满足的话，就会自动将 SDS 的空间扩展至执行修改所需的大小，然后才执行实际的修改操作，所以使用 SDS 既不需要手动修改 SDS 的空间大小,也不会出现前面所说的缓冲区溢出的问题。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;flags，用来表示不同类型的 SDS&lt;/strong&gt;。一共设计了5种类型，分别是sdshdr5、sdshdr8、sdshdr16、sdshdr32和 sdshdr64。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;buf[]，字符数组，用来保存实际数据&lt;/strong&gt;。不仅可以保存字符串，也可以保存二进制数据。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;总的来说，Redis 的 SDS 结构在原本字符数组之上，增加了三个元数据:len、aloc、flags，用来解决 C语言字符串的缺陷。&lt;/p&gt;
+&lt;p&gt;因此有以下几个优点：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;O(1)复杂度获取字符串长度
+SDS 结构因为加入了 len 成员变量，那么&lt;strong&gt;获取字符串长度的时候，直接返回这个成员变量的值就行，所以复杂度只有 O(1)。&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;二进制安全
+SDS 不需要用 “\0”字符来标识字符串结尾了，而是&lt;strong&gt;有个专门的 len 成员变量来记录长度，所以可存储包含“\0”的数据&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;不会发生缓存区溢出
+&lt;strong&gt;当判断出缓冲区大小不够用时，Redis 会自动将扩大 SDS 的空间大小&lt;/strong&gt;，且分配额外的「未使用空间」&lt;strong&gt;有效的减少内存分配次数&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;节省内存空间
+&lt;strong&gt;不同类型的结构体，是为了能灵活保存不同大小的字符串，从而有效节省内存空间&lt;/strong&gt;，并取消了结构体在编译过程中的内存对齐。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h2 id=&#34;链表&#34;&gt;链表
+&lt;/h2&gt;&lt;h3 id=&#34;链表节点结构设计&#34;&gt;链表节点结构设计
+&lt;/h3&gt;&lt;p&gt;有前置节点和后置节点，为双向链表。&lt;/p&gt;
+&lt;h3 id=&#34;链表结构设计&#34;&gt;链表结构设计
+&lt;/h3&gt;&lt;p&gt;Redis在listNode结构体的基础上又封装了list这个数据结构，这样操作起来会更方便。链表结构为：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;16
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;17
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;18
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;typedef struct list {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //链表头节点
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    listNode thead;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //链表尾节点
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    listNode
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    *tail;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //节点值复制函数
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    void
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    (*dup)(void
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    *ptr);
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //节点值释放函数
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    void (*free)(void
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    *ptr);
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //节点值比较函数
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    int (*match)(void *ptr, void *key);
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //链表节点数量
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    unsigned long len;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;} list;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;list结构为链表提供了链表头指针head、链表尾节点tail、链表节点数量len、以及可以自定义实现的dup、free、match函数。&lt;/p&gt;
+&lt;h3 id=&#34;链表的优势与缺陷&#34;&gt;链表的优势与缺陷
+&lt;/h3&gt;&lt;p&gt;Redis的链表实现优点如下：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;listNode 链表节点的结构里带有 prev 和 next 指针，&lt;strong&gt;获取某个节点的前置节点或后置节点的时间复杂度只需O(1)，而且这两个指针都可以指向 NULL，所以链表是无环链表&lt;/strong&gt;;&lt;/li&gt;
+&lt;li&gt;list 结构因为提供了表头指针 head 和表尾节点 tail，所以&lt;strong&gt;获取链表的表头节点和表尾节点的时间复杂度只需O(1)&lt;/strong&gt;;&lt;/li&gt;
+&lt;li&gt;list 结构因为提供了链表节点数量 len，所以&lt;strong&gt;获取链表中的节点数量的时间复杂度只需O(1)&lt;/strong&gt;;&lt;/li&gt;
+&lt;li&gt;listNode 链表节使用 void* 指针保存节点值，并且可以通过 list 结构的 dup、free、match 函数指针为节点设置该节点类型特定的函数，&lt;strong&gt;因此链表节点可以保存各种不同类型的值&lt;/strong&gt;；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;链表的缺陷：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;链表每个节点之间的内存都是不连续的，意味着&lt;strong&gt;无法很好利用 CPU 缓存&lt;/strong&gt;。能很好利用 CPU 缓存的数据结构就是数组，因为数组的内存是连续的，这样就可以充分利用CPU 缓存来加速访问。&lt;/li&gt;
+&lt;li&gt;还有一点，保存一个链表节点的值都需要一个链表节点结构头的分配，&lt;strong&gt;内存开销较大&lt;/strong&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此，Redis 3.0 的 List 对象在数据量比较少的情况下，会采用「压缩列表」作为底层数据结构的实现，它的优势是节省内存空间，并且是内存紧凑型的数据结构。&lt;/p&gt;
+&lt;p&gt;不过，压缩列表存在性能问题，所以 Redis 在 3.2 版本设计了新的数据结构quicklist，并将 List 对象的底层数据结构改由 quicklist 实现。&lt;/p&gt;
+&lt;p&gt;然后在 Redis 5.0 设计了新的数据结构listpack，沿用了压缩列表紧凑型的内存布局，最终在最新的 Redis版本，将 Hash 对象和 Zset 对象的底层数据结构实现之一的压缩列表，替换成由 listpack 实现。&lt;/p&gt;
+&lt;h2 id=&#34;压缩列表&#34;&gt;压缩列表
+&lt;/h2&gt;&lt;p&gt;压缩列表的最大特点，就是它被设计成一种内存紧凑型的数据结构，占用一块连续的内存空间，不仅可以利用 CPU 缓存，而且会针对不同长度的数据，进行相应编码，这种方法可以有效地节省内存开销。&lt;/p&gt;
+&lt;p&gt;但是，压缩列表的缺陷也是有的:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;不能保存过多的元素，否则查询效率就会降低;&lt;/li&gt;
+&lt;li&gt;新增或修改某个元素时，压缩列表占用的内存空间需要重新分配，甚至可能引发连锁更新的问题。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此，Redis 对象(List 对象、Hash 对象、Zset 对象)包含的元素数量较少，或者元素值不大的情况才会使用压缩列表作为底层数据结构。&lt;/p&gt;
+&lt;h3 id=&#34;压缩列表结构设计&#34;&gt;压缩列表结构设计
+&lt;/h3&gt;&lt;p&gt;压缩列表是Redis为了节约内存而开发的，它是&lt;strong&gt;由连续内存块组成的顺序型数据结构&lt;/strong&gt;，有点类似于数组。&lt;/p&gt;
+&lt;p&gt;压缩列表在表头有三个字段：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;zlbytes&lt;/strong&gt;，记录整个压缩列表占用对内存字节数;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;zltail&lt;/strong&gt;，记录压缩列表「尾部」节点距离起始地址由多少字节，也就是列表尾的偏移量&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;zllen&lt;/strong&gt;，记录压缩列表包含的节点数量;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;zlend&lt;/strong&gt;，标记压缩列表的结束点，固定值 0xFF(十进制255)&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;在压缩列表中，如果我们要查找定位第一个元素和最后一个元素，可以通过表头三个字段(zllen)的长度直接定位，复杂度是 0(1)。而&lt;strong&gt;查找其他元素时，就没有这么高效了，只能逐个查找，此时的复杂度就是O(N)了，因此压缩列表不适合保存过多的元素&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;压缩列表节点（entry）包含三部分内容：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;prevlen&lt;/strong&gt;，记录了「前一个节点」的长度，目的是为了实现从后向前遍历;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;encoding&lt;/strong&gt;，记录了当前节点实际数据的「类型和长度」，类型主要有两种:字符串和整数。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;data&lt;/strong&gt;，记录了当前节点的实际数据，类型和长度都由encoding 决定;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;当我们往压缩列表中插入数据时，压缩列表就会根据数据类型是字符串还是整数，以及数据的大小，会使用不同空间大小的 preven 和 encoding 这两个元素里保存的信息，&lt;strong&gt;这种根据数据大小和类型进行不同的空间大小分配的设计思想，正是 Redis 为了节省内存而采用的。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;分别说下，prevlen 和 encoding 是如何根据数据的大小和类型来进行不同的空间大小分配。&lt;/p&gt;
+&lt;p&gt;压缩列表里的每个节点中的 prevlen 属性都记录了「前一个节点的长度|，而且 prevlen 属性的空间大小&lt;/p&gt;
+&lt;p&gt;跟前一个节点长度值有关，比如:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果前一个节点的长度小于 254 字节，那么 preven 属性需要用1字节的空间来保存这个长度值;&lt;/li&gt;
+&lt;li&gt;如果前一个节点的长度大于等于 254 字节，那么 previen 属性需要用5 字节的空间来保存这个长度值;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;encoding 属性的空间大小跟数据是字符串还是整数，以及字符串的长度有关。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果&lt;strong&gt;当前节点的数据是整数&lt;/strong&gt;，则 encoding 会使用&lt;strong&gt;1字节的空间&lt;/strong&gt;进行编码，也就是 encoding 长度为 1字节。通过 encoding 确认了整数类型，就可以确认整数数据的实际大小了，比如如果 encoding 编码确认了数据是 int16 整数，那么 data 的长度就是 int16 的大小。&lt;/li&gt;
+&lt;li&gt;如果&lt;strong&gt;当前节点的数据是字符串，根据字符串的长度大小&lt;/strong&gt;，encoding 会使用&lt;strong&gt;1字节/2字节/5字节的空间&lt;/strong&gt;进行编码，encoding 编码的前两个 bit 表示数据的类型，后续的其他 bit 标识字符串数据的实际长度即 data 的长度。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;压缩列表的缺陷&#34;&gt;压缩列表的缺陷
+&lt;/h3&gt;&lt;p&gt;空间扩展操作也就是重新分配内存，因此&lt;strong&gt;连锁更新一旦发生，就会导致压缩列表占用的内存空间要多次重新分配，这就会直接影响到压缩列表的访问性能。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;所以说，&lt;strong&gt;虽然压缩列表紧凑型的内存布局能节省内存开销，但是如果保存的元素数量增加了，或是元素变大了，会导致内存重新分配，最糟糕的是会有「连锁更新」的问题。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;因此，&lt;strong&gt;压缩列表只会用于保存的节点数量不多的场景&lt;/strong&gt;，只要节点数量足够小，即使发生连锁更新，也是能接受的。&lt;/p&gt;
+&lt;p&gt;虽说如此，Redis 针对压缩列表在设计上的不足，在后来的版本中，新增设计了两种数据结构:quicklist(Redis 3.2 引入)和 listpack(Redis 5.0 引入)。这两种数据结构的设计目标，就是尽可能地保持压缩列表节省内存的优势，同时解决压缩列表的「连锁更新」的问题。&lt;/p&gt;
+&lt;h4 id=&#34;连锁更新问题&#34;&gt;连锁更新问题
+&lt;/h4&gt;&lt;p&gt;&lt;strong&gt;压缩列表新增某个元素或修改某个元素时，如果空间不够，压缩列表占用的内存空间就需要重新分配,而当新插入的元素较大时，可能会导致后续元素的 prevlen 占用空间都发生变化，从而引起「连锁更新」问题，导致每个元素的空间都要重新分配，造成访问压缩列表性能的下降。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;这种在特殊情况下产生的连续多次空间扩展操作就叫做「连锁更新」&lt;/strong&gt;，就像多米诺牌的效应一样。&lt;/p&gt;
+&lt;h2 id=&#34;哈希表&#34;&gt;哈希表
+&lt;/h2&gt;&lt;p&gt;哈希表是一种保存键值对(key-value)的数据结构。&lt;/p&gt;
+&lt;p&gt;哈希表中的每一个 key 都是独一无二的，程序可以根据 key 查找到与之关联的 value，或者通过 key 来更新 value，又或者根据 key 来删除整个 key-value等等。&lt;/p&gt;
+&lt;p&gt;优点：&lt;strong&gt;以 O(1)的复杂度快速查询数据&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;缺点：在哈希表大小固定的情况下，随着数据不断增多，那么&lt;strong&gt;哈希冲突&lt;/strong&gt;的可能性也会越高。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Redis 采用了「链式哈希」来解决哈希冲突&lt;/strong&gt;，在不扩容哈希表的前提下，将具有相同哈希值的数据串起来，形成链接起，以便这些数据在表中仍然可以被查询到。&lt;/p&gt;
+&lt;h3 id=&#34;哈希表结构设计&#34;&gt;哈希表结构设计
+&lt;/h3&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;typedef struct dictht {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //哈希表数组
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    dictEntry
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    table;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //哈希表大小
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    unsigned long size;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //哈希表大小掩码,用于计算索引值
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    unsigned long sizemask;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //该哈希表已有的节点数量
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    unsigned long used;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;}dictht;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;可以看到，哈希表是一个数组(dictEntry **table)，数组的每个元素是一个指向「哈希表节点(dictEntry)」的指针。&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://L-Y-D-0129.github.io/image/%e5%93%88%e5%b8%8c%e8%a1%a8.png&#34;
+	
+	
+	
+	loading=&#34;lazy&#34;
+	
+	
+&gt;&lt;/p&gt;
+&lt;p&gt;哈希表节点的结构如下：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;typedef struct dictEntry {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //键值对中的键
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    void *key;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //键值对中的值
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    union (
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    void *val;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    uint64_t u64;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    int64_t s64;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    double d;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    } v;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //指向下一个哈希表节点,形成链表
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    struct dictEntry next;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;} dictentry;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;dictEntry 结构里不仅包含指向键和值的指针，还包含了指向下一个哈希表节点的指针，这个指针可以将多个哈希值相同的键值对链接起来，以此来解决哈希冲突的问题，这就是链式哈希。&lt;/p&gt;
+&lt;h3 id=&#34;哈希冲突&#34;&gt;哈希冲突
+&lt;/h3&gt;&lt;p&gt;哈希表实际上是一个数组，数组里的每一个元素就是一个哈希桶。&lt;/p&gt;
+&lt;p&gt;当一个键值对的键经过 Hash 函数计算后得到哈希值，再将(哈希值 % 哈希表大小)取模计算，得到的结果值就是该 key-value 对应的数组元素位置，也就是第几个哈希桶。、&lt;/p&gt;
+&lt;h4 id=&#34;什么是哈希冲突呢&#34;&gt;什么是哈希冲突呢
+&lt;/h4&gt;&lt;p&gt;举个例子，有一个可以存放8个哈希桶的哈希表。key1 经过哈希函数计算后，再将「哈希值%8」进行取模计算，结果值为 1，那么就对应哈希桶 1，类似的，key9 和 key10 分别对应哈希桶1和桶 6。&lt;/p&gt;
+&lt;p&gt;此时，key1 和 key9 对应到了相同的哈希桶中，这就发生了哈希冲突。&lt;/p&gt;
+&lt;p&gt;因此，&lt;strong&gt;当有两个以上数量的 kay 被分配到了哈希表中同一个哈希桶上时，此时称这些 key 发生了冲突。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;链式哈希&#34;&gt;链式哈希
+&lt;/h3&gt;&lt;p&gt;Redis采用了链式哈希的方法解决哈希冲突。&lt;/p&gt;
+&lt;h4 id=&#34;链式哈希怎么实现的&#34;&gt;链式哈希怎么实现的？
+&lt;/h4&gt;&lt;p&gt;实现的方式就是每个哈希表节点都有一个 next 指针，用于指向下一个哈希表节点，因此多个哈希表节点可以用 next 指针构成一个单项链表，&lt;strong&gt;被分配到同一个哈希桶上的多个节点可以用这个单项链表连接起来，这样就解决了哈希冲突。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;还是用前面的哈希冲突例子，key1 和 key9 经过哈希计算后，都落在同一个哈希桶，链式哈希的话，key1就会通过 next 指针指向 key9，形成一个单向链表。&lt;/p&gt;
+&lt;p&gt;不过，链式哈希局限性也很明显，随着链表长度的增加，在查询这一位置上的数据的耗时就会增加，毕竟链表的查询的时间复杂度是 O(n)。&lt;/p&gt;
+&lt;p&gt;要想解决这一问题，就需要进行rehash，也就是对哈希表的大小进行扩展。&lt;/p&gt;
+&lt;h3 id=&#34;rehash&#34;&gt;rehash
+&lt;/h3&gt;&lt;p&gt;在实际使用哈希表时，Redis 定义一个 dict 结构体，这个结构体里定义了两个哈希表(ht[2])。&lt;/p&gt;
+&lt;p&gt;之所以定义了两个哈希表，是因为进行rehash的时候，需要用上两个哈希表。&lt;/p&gt;
+&lt;p&gt;在正常服务请求阶段，插入的数据，都会写入到「哈希表1」，此时的「哈希表2」 并没有被分配空间。&lt;/p&gt;
+&lt;p&gt;随着数据逐步增多，触发了 rehash 操作，这个过程分为三步:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;·给「哈希表 2」分配空间，一般会比「哈希表1」大一倍(两倍的意思);&lt;/li&gt;
+&lt;li&gt;将「哈希表1」的数据迁移到「哈希表 2」 中;&lt;/li&gt;
+&lt;li&gt;迁移完成后，「哈希表1」的空间会被释放，并把「哈希表 2」设置为「哈希表1」，然后在「哈希表2」 新创建一个空白的哈希表，为下次 rehash 做准备。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这个过程看起来简单，但是其实第二步很有问题，&lt;strong&gt;如果哈希表1的数据非常庞大，那么在迁移至哈希表2的时候，因为会涉及大量的数据拷贝，此时可能会对Redis造成阻塞，无法服务其他请求。&lt;/strong&gt;&lt;/p&gt;
+&lt;h3 id=&#34;渐进式rehash&#34;&gt;渐进式rehash
+&lt;/h3&gt;&lt;p&gt;为了避免 rehash 在数据迁移过程中，因拷贝数据的耗时，影响 Redis 性能的情况，所以 Redis 采用了渐进式 rehash，也就是将数据的迁移的工作不再是一次性迁移完成，而是分多次迁移。&lt;/p&gt;
+&lt;p&gt;渐进式 rehash 步骤如下:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;给「哈希表 2」分配空间;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;在 rehash 进行期间，每次哈希表元素进行新增、删除、查找或者更新操作时，Redis 除了会执行对应的操作之外，还会顺序将「哈希表1」中索引位置上的所有 key-value 迁移到「哈希表 2」 上;&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;随着处理客户端发起的哈希表操作请求数量越多，最终在某个时间点会把「哈希表1」的所有 keyvalue 迁移到「哈希表 2」，从而完成 rehash 操作。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这样就巧妙地把一次性大量数据迁移工作的开销，分摊到了多次处理请求的过程中，避免了一次性 rehash的耗时操作。&lt;/p&gt;
+&lt;p&gt;在进行渐进式 rehash 的过程中，会有两个哈希表，所以在渐进式 rehash 进行期间，哈希表元素的删除、查找、更新等操作都会在这两个哈希表进行。&lt;/p&gt;
+&lt;p&gt;比如，查找一个 key 的值的话，先会在「哈希表1」里面进行查找，如果没找到，就会继续到哈希表2里面进行找到。&lt;/p&gt;
+&lt;p&gt;另外，在渐进式 rehash 进行期间，新增一个 key-value 时，会被保存到「哈希表2」里面，而「哈希表1」则不再进行任何添加操作，这样保证了「哈希表1」的 key-value 数量只会减少，随着 rehash 操作的完成，最终「哈希表1」就会变成空表，&lt;/p&gt;
+&lt;p&gt;而rehash 的触发条件跟**负载因子(load factor)**有关系。&lt;/p&gt;
+&lt;p&gt;负载因子可以通过下面这个公式计算:
+&lt;/p&gt;
+$$
+                            负载因子 = 哈希表已保存节点数量 / 哈希表大小
+$$&lt;p&gt;
+触发 rehash 操作的条件，主要有两个:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;当负载因子大于等于1，并且 Redis 没有在执行 bgsave 命令或者 bgrewiteaof 命令，也就是没有执行RDB 快照或没有进行 AOF 重写的时候，就会进行 rehash 操作。&lt;/strong&gt;&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;当负载因子大于等于5时，此时说明哈希冲突非常严重了，不管有没有有在执行 RDB 快照或 AOF 重写，都会强制进行 rehash 操作。&lt;/strong&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;整数集合&#34;&gt;整数集合
+&lt;/h2&gt;&lt;p&gt;整数集合是 Set 对象的底层实现之一。当一个 Set 对象只包含整数值元素，并且元素数量不大时，就会使用整数集这个数据结构作为底层实现。&lt;/p&gt;
+&lt;h3 id=&#34;整数集合结构设计&#34;&gt;整数集合结构设计
+&lt;/h3&gt;&lt;p&gt;整数集合的本质是一块连续内存空间，它的结构定义如下：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;8
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;typedef struct intset {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //编码方式
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    uint32_t encoding
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //集合包含的元素数量
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    uint32 t length;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //保存元素的数组
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    int8_t contents[];
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;}intset;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;可以看到，保存元素的容器是一个 contents 数组，虽然 contents 被声明为 int8_t类型的数组，但是实际上 contents 数组并不保存任何 int8_t 类型的元素，contents 数组的真正类型取决于 intset 结构体里的encoding 属性的值。比如:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果 encoding 属性值为 INTSET_ENC INT16，那么 contents 就是一个 int16_t类型的数组，数组中每一个元素的类型都是 int16_t;&lt;/li&gt;
+&lt;li&gt;如果 encoding 属性值为 INTSET_ENC_INT32，那么 contents 就是一个 int32_t类型的数组，数组中每一个元素的类型都是 int32_t;&lt;/li&gt;
+&lt;li&gt;如果 encoding 属性值为 INTSET_ENC_INT64，那么 contents 就是一个 int64_t类型的数组，数组中每-个元素的类型都是 int64_t;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;不同类型的 contents 数组，意味着数组的大小也会不同。&lt;/p&gt;
+&lt;h3 id=&#34;整数集合的升级操作&#34;&gt;整数集合的升级操作
+&lt;/h3&gt;&lt;p&gt;整数集合会有一个升级规则，就是当我们将一个新元素加入到整数集合里面，如果新元素的类型(int32_t)比整数集合现有所有元素的类型(int16_t)都要长时，整数集合需要先进行升级，也就是按新元素的类型(int32_t)扩展 contents 数组的空间大小，然后才能将新元素加入到整数集合里，当然升级的过程中，也要维持整数集合的有序性。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;整数集合升级的过程不会重新分配一个新类型的数组，而是在原本的数组上扩展空间，然后在将每个元素按间隔类型大小分割，如果 encoding 属性值为 INTSET_ENC_INT16，则每个元素的间隔就是 16 位。&lt;/strong&gt;&lt;/p&gt;
+&lt;h4 id=&#34;整数集合升级有什么好处呢&#34;&gt;整数集合升级有什么好处呢？
+&lt;/h4&gt;&lt;p&gt;如果要让一个数组同时保存 int16_t、int32_t、int64_t 类型的元素，最简单做法就是直接使用 int64_t 类型的数组。不过这样的话，当如果元素都是 int16_t 类型的，就会造成内存浪费的情况。&lt;/p&gt;
+&lt;p&gt;整数集合升级就能避免这种情况，如果一直向整数集合添加 int16_t 类型的元素，那么整数集合的底层实现就一直是用 int16_t 类型的数组，只有在我们要将 int32_t 类型或 int64_t 类型的元素添加到集合时，才会对数组进行升级操作。&lt;/p&gt;
+&lt;p&gt;因此，整数集合升级的好处是节省内存资源。&lt;/p&gt;
+&lt;h4 id=&#34;整数集合支持降级操作吗&#34;&gt;整数集合支持降级操作吗？
+&lt;/h4&gt;&lt;p&gt;&lt;strong&gt;不支持降级操作&lt;/strong&gt;，一旦对数组进行了升级，就会一直保持升级后的状态。&lt;/p&gt;
+&lt;h2 id=&#34;跳表&#34;&gt;跳表
+&lt;/h2&gt;&lt;p&gt;Redis 只有 Zset 对象的底层实现用到了跳表，跳表的优势是能支持平均 O(logN) 复杂度的节点查找。&lt;/p&gt;
+&lt;p&gt;zset 结构体里有两个数据结构：一个是跳表，一个是哈希表。这样的好处是既能进行高效的范围查询，也能进行高效单点查询。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;typedef struct zset {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    dict *dict;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    zskiplist *zsl;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;} zset;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;set 对象在执行数据插入或是数据更新的过程中，会依次在跳表和哈希表中插入或更新相应的数据，从而保证了跳表和哈希表中记录的信息一致。&lt;/p&gt;
+&lt;p&gt;Zset 对象能支持范围查询（如 ZRANGEBYSCORE 操作），这是因为它的数据结构设计采用了&lt;strong&gt;跳表&lt;/strong&gt;，而又能以常数复杂度获取元素权重（如 ZSCORE 操作），这是因为它同时采用了&lt;strong&gt;哈希表&lt;/strong&gt;进行索引。&lt;/p&gt;
+&lt;p&gt;虽然Zset 对象在使用跳表作为数据结构的时候，是使用由「哈希表+跳表」组成的 struct zset，但是struct zset 中的哈希表只是用于以常数复杂度获取元素权重，其余大部分操作都是跳表实现的。&lt;/p&gt;
+&lt;h3 id=&#34;跳表结构设计&#34;&gt;跳表结构设计
+&lt;/h3&gt;&lt;p&gt;链表在查找元素的时候，因为需要逐一查找，所以查询效率非常低，时间复杂度是O(N)，于是就出现了跳表。&lt;strong&gt;跳表是在链表基础上改进过来的，实现了一种「多层」的有序链表&lt;/strong&gt;，这样的好处是能快读定位数据。&lt;/p&gt;
+&lt;p&gt;图中头节点有 L0~L2 三个头指针，分别指向了不同层级的节点，然后每个层级的节点都通过指针连接起来：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;L0 层级共有 5 个节点，分别是节点1、2、3、4、5；&lt;/li&gt;
+&lt;li&gt;L1 层级共有 3 个节点，分别是节点 2、3、5；&lt;/li&gt;
+&lt;li&gt;L2 层级只有 1 个节点，也就是节点 3 。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果我们要在链表中查找节点 4 这个元素，只能从头开始遍历链表，需要查找 4 次，而使用了跳表后，只需要查找 2 次就能定位到节点 4，因为可以在头节点直接从 L2 层级跳到节点 3，然后再往前遍历找到节点 4。&lt;/p&gt;
+&lt;p&gt;可以看到，这个查找过程就是在多个层级上跳来跳去，最后定位到元素。当数据量很大时，跳表的查找复杂度就是 O(logN)。&lt;/p&gt;
+&lt;p&gt;跳表节点数据结构：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;11
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;12
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;13
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;14
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;15
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;typedef struct zskiplistNode {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //Zset 对象的元素值
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    sds ele
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //元素权重值
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    double score;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //后向指针
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    struct zskiplistNode *backward;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    //节点的level数组，保存每层上的前向指针和跨度
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    struct zskiplistLevel {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        struct zskiplistNode *forward;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;        unsigned long span;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    } level[];
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;} zskiplistNode;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;Zset 对象要同时保存「元素」和「元素的权重」，对应到跳表节点结构里就是 sds 类型的 ele 变量和 double 类型的 score 变量。每个跳表节点都有一个后向指针（struct zskiplistNode *backward），指向前一个节点，目的是为了方便从跳表的尾节点开始访问节点，这样倒序查找时很方便。&lt;/p&gt;
+&lt;p&gt;跳表是一个带有层级关系的链表，而且每一层级可以包含多个节点，每一个节点通过指针连接起来，实现这一特性就是靠跳表节点结构体中的zskiplistLevel 结构体类型的 level 数组。&lt;/p&gt;
+&lt;p&gt;level 数组中的每一个元素代表跳表的一层，也就是由 zskiplistLevel 结构体表示，比如 leve[0] 就表示第一层，leve[1] 就表示第二层。zskiplistLevel 结构体里定义了「指向下一个跳表节点的指针」和「跨度」，跨度时用来记录两个节点之间的距离。&lt;/p&gt;
+&lt;p&gt;**跨度实际上是为了计算这个节点在跳表中的排位。**具体怎么做的呢？因为跳表中的节点都是按序排列的，那么计算某个节点排位的时候，从头节点点到该结点的查询路径上，将沿途访问过的所有层的跨度累加起来，得到的结果就是目标节点在跳表中的排位。&lt;/p&gt;
+&lt;p&gt;跳表结构体：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;typedef struct zskiplist {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    struct zskiplistNode *header, *tail;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    unsigned long length;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;    int level;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;} zskiplist;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;跳表结构里包含了：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;跳表的头尾节点，便于在O(1)时间复杂度内访问跳表的头节点和尾节点；&lt;/li&gt;
+&lt;li&gt;跳表的长度，便于在O(1)时间复杂度获取跳表节点的数量；&lt;/li&gt;
+&lt;li&gt;跳表的最大层数，便于在O(1)时间复杂度获取跳表中层高最大的那个节点的层数量；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;跳表节点查询过程&#34;&gt;跳表节点查询过程
+&lt;/h3&gt;&lt;p&gt;查找一个跳表节点的过程时，跳表会从头节点的最高层开始，逐一遍历每一层。在遍历某一层的跳表节点时，会用跳表节点中的 SDS 类型的元素和元素的权重来进行判断，共有两个判断条件：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果当前节点的权重「小于」要查找的权重时，跳表就会访问该层上的下一个节点。&lt;/li&gt;
+&lt;li&gt;如果当前节点的权重「等于」要查找的权重时，并且当前节点的 SDS 类型数据「小于」要查找的数据时，跳表就会访问该层上的下一个节点。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果上面两个条件都不满足，或者下一个节点为空时，跳表就会使用目前遍历到的节点的 level 数组里的下一层指针，然后沿着下一层指针继续查找，这就相当于跳到了下一层接着查找。&lt;/p&gt;
+&lt;h3 id=&#34;跳表节点层数设置&#34;&gt;跳表节点层数设置
+&lt;/h3&gt;&lt;p&gt;跳表的相邻两层的节点数量的比例会影响跳表的查询性能。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;跳表的相邻两层的节点数量最理想的比例是 2:1，查找复杂度可以降低到 O(logN)。&lt;/strong&gt;&lt;/p&gt;
+&lt;h4 id=&#34;那怎样才能维持相邻两层的节点数量的比例为-2--1-呢&#34;&gt;那怎样才能维持相邻两层的节点数量的比例为 2 : 1 呢？
+&lt;/h4&gt;&lt;p&gt;如果采用新增节点或者删除节点时，来调整跳表节点以维持比例的方法的话，会带来额外的开销。&lt;/p&gt;
+&lt;p&gt;Redis 则采用一种巧妙的方法是，&lt;strong&gt;跳表在创建节点的时候，随机生成每个节点的层数&lt;/strong&gt;，并没有严格维持相邻两层的节点数量比例为 2 : 1 的情况。&lt;/p&gt;
+&lt;p&gt;具体的做法是，&lt;strong&gt;跳表在创建节点时候，会生成范围为[0-1]的一个随机数，如果这个随机数小于 0.25（相当于概率 25%），那么层数就增加 1 层，然后继续生成下一个随机数，直到随机数的结果大于 0.25 结束，最终确定该节点的层数。&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这样的做法，相当于每增加一层的概率不超过 25%，层数越高，概率越低，层高最大限制是 64。&lt;/p&gt;
+&lt;p&gt;虽然我前面讲解跳表的时候，图中的跳表的「头节点」都是 3 层高，&lt;strong&gt;但是其实如果层高最大限制是 64，那么在创建跳表「头节点」的时候，就会直接创建 64 层高的头节点&lt;/strong&gt;。&lt;/p&gt;
+&lt;h3 id=&#34;为什么用跳表而不用平衡树&#34;&gt;为什么用跳表而不用平衡树？
+&lt;/h3&gt;&lt;p&gt;主要是从内存占用、对范围查找的支持、实现难易程度这三方面总结的原因：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;**从内存占用上来比较，跳表比平衡树更灵活一些。**平衡树每个节点包含 2 个指针（分别指向左右子树），而跳表每个节点包含的指针数目平均为 1/(1-p)，具体取决于参数 p 的大小。如果像 Redis里的实现一样，取 p=1/4，那么平均每个节点包含 1.33 个指针，比平衡树更有优势。&lt;/li&gt;
+&lt;li&gt;**在做范围查找的时候，跳表比平衡树操作要简单。**在平衡树上，我们找到指定范围的小值之后，还需要以中序遍历的顺序继续寻找其它不超过大值的节点。如果不对平衡树进行一定的改造，这里的中序遍历并不容易实现。而在跳表上进行范围查找就非常简单，只需要在找到小值之后，对第 1 层链表进行若干步的遍历就可以实现。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;从算法实现难度上来比较，跳表比平衡树要简单得多&lt;/strong&gt;。平衡树的插入和删除操作可能引发子树的调整，逻辑复杂，而跳表的插入和删除只需要修改相邻节点的指针，操作简单又快速。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;quicklist&#34;&gt;quicklist
+&lt;/h2&gt;&lt;p&gt;在 Redis 3.0 之前，List 对象的底层数据结构是双向链表或者压缩列表。然后在 Redis 3.2 的时候，List 对象的底层改由 quicklist 数据结构实现。&lt;/p&gt;
+&lt;p&gt;其实 quicklist 就是「双向链表 + 压缩列表」组合，因为一个 quicklist 就是一个链表，而链表中的每个元素又是一个压缩列表。&lt;/p&gt;
+&lt;p&gt;在前面讲压缩列表的时候，我也提到了压缩列表的不足，虽然压缩列表是通过紧凑型的内存布局节省了内存开销，但是因为它的结构设计，如果保存的元素数量增加，或者元素变大了，压缩列表会有「连锁更新」的风险，一旦发生，会造成性能下降。&lt;/p&gt;
+&lt;p&gt;quicklist 解决办法，&lt;strong&gt;通过控制每个链表节点中的压缩列表的大小或者元素个数，来规避连锁更新的问题。因为压缩列表元素越少或越小，连锁更新带来的影响就越小，从而提供了更好的访问性能。&lt;/strong&gt;&lt;/p&gt;
+&lt;h2 id=&#34;listpack&#34;&gt;listpack
+&lt;/h2&gt;&lt;p&gt;quicklist 虽然通过控制 quicklistNode 结构里的压缩列表的大小或者元素个数，来减少连锁更新带来的性能影响，但是并没有完全解决连锁更新的问题。&lt;/p&gt;
+&lt;p&gt;因为 quicklistNode 还是用了压缩列表来保存元素，压缩列表连锁更新的问题，来源于它的结构设计，所以要想彻底解决这个问题，需要设计一个新的数据结构。&lt;/p&gt;
+&lt;p&gt;于是，Redis 在 5.0 新设计一个数据结构叫 listpack，目的是替代压缩列表，它最大特点是 listpack 中每个节点不再包含前一个节点的长度了，压缩列表每个节点正因为需要保存前一个节点的长度字段，就会有连锁更新的隐患。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;listpack 没有压缩列表中记录前一个节点长度的字段了，listpack 只记录当前节点的长度，当我们向 listpack 加入一个新元素的时候，不会影响其他节点的长度字段的变化，从而避免了压缩列表的连锁更新问题。&lt;/strong&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;blockquote&gt;
+&lt;p&gt;图片出处为小林coding&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h1 id=&#34;aof持久化&#34;&gt;AOF持久化
+&lt;/h1&gt;&lt;p&gt;AOF文件的内容是操作命令&lt;/p&gt;
+&lt;h2 id=&#34;aof日志&#34;&gt;AOF日志
+&lt;/h2&gt;&lt;p&gt;其思想是Redis每执行一条写操作命令，就把该命令以追加的方式写入到一个文件里，重启 Redis 的时候，先去读取这个文件里的命令，并且执行它，就相当于恢复了缓存数据了。&lt;/p&gt;
+&lt;p&gt;客户端发送写命令到Redis。第一步执行写命令到内存；第二步记录命令到日志，日志存放到硬盘。&lt;/p&gt;
+&lt;p&gt;这种保存写操作命令到日志的持久化方式，就是Redis里的&lt;strong&gt;AOF&lt;/strong&gt;（Append Only File）持久化功能，&lt;strong&gt;注意只会记录写操作命令，读操作命令是不会被记录的&lt;/strong&gt;，因为没意义。&lt;/p&gt;
+&lt;p&gt;在Redis中AOF持久化功能默认是不开启的。&lt;/p&gt;
+&lt;p&gt;AOF日志文件其实就是普通的文本，我们可以通过cat命令查看里面的内容，但其中记录的内容有一定的阅读规则。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;6
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;*3
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;$3
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;set
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;$4
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;name
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;$7xiaoxin
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;「*3」表示当前命令有三个部分，每部分都是以「$+数字」开头，后面紧跟着具体的命令、键或值。然后，这里的「数字」表示这部分中的命令、键或值一共有多少字节。例如，「$3 set」表示这部分有 3 个字节，也就是「set」命令这个字符串的长度。&lt;/p&gt;
+&lt;p&gt;Redis先执行写操作命令后，再将命令记录到AOF日志里，有以下两个好处：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;避免额外的检查开销&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;因为如果先将写操作命令记录到 AOF 日志里，再执行该命令的话，如果当前的命令语法有问题，那么如果不进行命令语法检查，该错误的命令记录到 AOF 日志里后，Redis 在使用日志恢复数据时，就可能会出错。&lt;/p&gt;
+&lt;p&gt;而如果先执行写操作命令再记录日志的话，只有在该命令执行成功后，才将命令记录到 AOF 日志里，这样就不用额外的检查开销，保证记录在 AOF 日志里的命令都是可执行并且正确的。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;不会阻塞当前写操作命令的执行&lt;/strong&gt;
+当写操作命令执行成功后，才会将命令记录到 AOF 日志。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;两个风险：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;执行写操作命令和记录日志是两个过程，那当 Redis 在还没来得及将命令写入到硬盘时，服务器发生宕机了，这个数据就会有&lt;strong&gt;丢失的风险&lt;/strong&gt;。&lt;/li&gt;
+&lt;li&gt;写操作命令执行成功后才记录到 AOF 日志，所以不会阻塞当前写操作命令的执行，但是&lt;strong&gt;可能会给「下一个」命令带来阻塞风险&lt;/strong&gt;。因为将命令写入到日志的这个操作也是在主进程完成的（执行命令也是在主进程），也就是说这两个操作是同步的。如果在将日志内容写入到硬盘时，服务器的硬盘的 I/O 压力太大，就会导致写硬盘的速度很慢，进而阻塞住了，也就会导致后续的命令无法执行。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;两个风险的共性就是跟「 AOF 日志写回硬盘的时机」有关。&lt;/p&gt;
+&lt;h2 id=&#34;三种写回策略&#34;&gt;三种写回策略
+&lt;/h2&gt;&lt;p&gt;Redis写入AOF日志过程：&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://L-Y-D-0129.github.io/image/AOF%e8%bf%87%e7%a8%8b.png&#34;
+	
+	
+	
+	loading=&#34;lazy&#34;
+	
+	
+&gt;&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Redis 执行完写操作命令后，会将命令追加到 server.aof_buf 缓冲区；&lt;/li&gt;
+&lt;li&gt;然后通过 write() 系统调用，将 aof_buf 缓冲区的数据写入到 AOF 文件，此时数据并没有写入到硬盘，而是拷贝到了内核缓冲区 page cache，等待内核将数据写入硬盘；&lt;/li&gt;
+&lt;li&gt;具体内核缓冲区的数据什么时候写入到硬盘，由内核决定。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Redis 提供了 3 种写回硬盘的策略，控制的就是上面说的第三步的过程。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Always&lt;/strong&gt;，这个单词的意思是「总是」，所以它的意思是每次写操作命令执行完后，同步将 AOF 日志数据写回硬盘；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Everysec&lt;/strong&gt;，这个单词的意思是「每秒」，所以它的意思是每次写操作命令执行完后，先将命令写入到 AOF 文件的内核缓冲区，然后每隔一秒将缓冲区里的内容写回到硬盘；&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;No&lt;/strong&gt;，意味着不由 Redis 控制写回硬盘的时机，转交给操作系统控制写回的时机，也就是每次写操作命令执行完后，先将命令写入到 AOF 文件的内核缓冲区，再由操作系统决定何时将缓冲区内容写回硬盘。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这 3 种写回策略都无法能完美解决「主进程阻塞」和「减少数据丢失」的问题，因为两个问题是对立的，偏向于一边的话，就会要牺牲另外一边，原因如下：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Always 策略的话，可以最大程度保证数据不丢失，但是由于它每执行一条写操作命令就同步将 AOF 内容写回硬盘，所以是不可避免会影响主进程的性能；&lt;/li&gt;
+&lt;li&gt;No 策略的话，是交由操作系统来决定何时将 AOF 日志内容写回硬盘，相比于 Always 策略性能较好，但是操作系统写回硬盘的时机是不可预知的，如果 AOF 日志内容没有写回硬盘，一旦服务器宕机，就会丢失不定数量的数据。&lt;/li&gt;
+&lt;li&gt;Everysec 策略的话，是折中的一种方式，避免了 Always 策略的性能开销，也比 No 策略更能避免数据丢失，当然如果上一秒的写操作命令日志没有写回到硬盘，发生了宕机，这一秒内的数据自然也会丢失。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;根据自己的业务场景进行选择：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果要高性能，就选择 No 策略；&lt;/li&gt;
+&lt;li&gt;如果要高可靠，就选择 Always 策略；&lt;/li&gt;
+&lt;li&gt;如果允许数据丢失一点，但又想性能高，就选择 Everysec 策略。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;以上三种策略其实是在控制fsync()函数的调用时机：&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;如果想要应用程序向文件写入数据后，能立马将数据同步到硬盘，就可以调用 fsync() 函数，这样内核就会将内核缓冲区的数据直接写入到硬盘，等到硬盘写操作完成后，该函数才会返回。&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Always 策略就是每次写入 AOF 文件数据后，就执行 fsync() 函数；&lt;/li&gt;
+&lt;li&gt;Everysec 策略就会创建一个异步任务来执行 fsync() 函数；&lt;/li&gt;
+&lt;li&gt;No 策略就是永不执行 fsync() 函数&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;aof重写机制&#34;&gt;AOF重写机制
+&lt;/h2&gt;&lt;p&gt;AOF 日志是一个文件，随着执行的写操作命令越来越多，文件的大小会越来越大。&lt;/p&gt;
+&lt;p&gt;如果当 AOF 日志文件过大就会带来性能问题，比如重启 Redis 后，需要读 AOF 文件的内容以恢复数据，如果文件过大，整个恢复的过程就会很慢。&lt;/p&gt;
+&lt;p&gt;所以，Redis 为了避免 AOF 文件越写越大，提供了 &lt;strong&gt;AOF 重写机制&lt;/strong&gt;，当 AOF 文件的大小超过所设定的阈值后，Redis 就会启用 AOF 重写机制，来压缩 AOF 文件。&lt;/p&gt;
+&lt;p&gt;AOF 重写机制是在重写时，读取当前数据库中的所有键值对，然后将每一个键值对用一条命令记录到「新的 AOF 文件」，等到全部记录完后，就将新的 AOF 文件替换掉现有的 AOF 文件。&lt;/p&gt;
+&lt;p&gt;重写工作完成后，就会将新的 AOF 文件覆盖现有的 AOF 文件，这就相当于压缩了 AOF 文件，使得 AOF 文件体积变小了。&lt;/p&gt;
+&lt;p&gt;然后，在通过 AOF 日志恢复数据时，只用执行这条命令，就可以直接完成这个键值对的写入了。&lt;/p&gt;
+&lt;p&gt;所以，重写机制的妙处在于，尽管某个键值对被多条写命令反复修改，&lt;strong&gt;最终也只需要根据这个「键值对」当前的最新状态，然后用一条命令去记录键值对&lt;/strong&gt;，代替之前记录这个键值对的多条命令，这样就减少了 AOF 文件中的命令数量。最后在重写工作完成后，将新的 AOF 文件覆盖现有的 AOF 文件。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;为什么重写 AOF 的时候，不直接复用现有的 AOF 文件，而是先写到新的 AOF 文件再覆盖过去呢？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;因为&lt;strong&gt;如果 AOF 重写过程中失败了，现有的 AOF 文件就会造成污染&lt;/strong&gt;，可能无法用于恢复使用。&lt;/p&gt;
+&lt;p&gt;所以 AOF 重写过程，先重写到新的 AOF 文件，重写失败的话，就直接删除这个文件就好，不会对现有的 AOF 文件造成影响。&lt;/p&gt;
+&lt;h2 id=&#34;aof后台重写&#34;&gt;AOF后台重写
+&lt;/h2&gt;&lt;p&gt;写入 AOF 日志的操作虽然是在主进程完成的，因为它写入的内容不多，所以一般不太影响命令的操作。&lt;/p&gt;
+&lt;p&gt;但重写这个过程其实是很耗时的，因为需要读取所有缓存的键值对数据，并为每个键值对生成一条命令，然后将其写入到新的 AOF 文件。所以重写的操作不能放在主进程里。&lt;/p&gt;
+&lt;p&gt;因此，Redis 的&lt;strong&gt;重写 AOF 过程是由后台子进程 bgrewriteaof 来完成的&lt;/strong&gt;，这么做可以达到两个好处：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;子进程进行 AOF 重写期间，主进程可以继续处理命令请求，从而避免阻塞主进程；&lt;/li&gt;
+&lt;li&gt;子进程带有主进程的&lt;strong&gt;数据副本&lt;/strong&gt;，这里使用子进程而不是线程，因为如果是使用线程，多线程之间会共享内存，那么在修改共享内存数据的时候，需要通过加锁来保证数据的安全，而这样就会降低性能。而使用子进程，创建子进程时，父子进程是共享内存数据的，不过这个共享的内存只能以只读的方式，而当父子进程任意一方修改了该共享内存，就会发生「写时复制」，于是父子进程就有了独立的数据副本，就不用加锁来保证数据安全。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;子进程是怎么拥有主进程一样的数据副本的呢？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;主进程在通过 fork 系统调用生成 bgrewriteaof 子进程时，操作系统会把主进程的「&lt;strong&gt;页表&lt;/strong&gt;」复制一份给子进程，这个页表记录着虚拟地址和物理地址映射关系，而不会复制物理内存，也就是说，两者的虚拟空间不同，但其对应的物理空间是同一个。&lt;/p&gt;
+&lt;p&gt;这样一来，子进程就共享了父进程的物理内存数据了，这样能够&lt;strong&gt;节约物理内存资源&lt;/strong&gt;，页表对应的页表项的属性会标记该物理内存的权限为&lt;strong&gt;只读&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;不过，当父进程或者子进程在向这个内存发起写操作时，CPU 就会触发&lt;strong&gt;写保护中断&lt;/strong&gt;，这个写保护中断是由于违反权限导致的，然后操作系统会在「写保护中断处理函数」里进行&lt;strong&gt;物理内存的复制&lt;/strong&gt;，并重新设置其内存映射关系，将父子进程的内存读写权限设置为可读写，最后才会对内存进行写操作，这个过程被称为「&lt;strong&gt;写时复制(Copy On Write)&lt;/strong&gt;」。&lt;/p&gt;
+&lt;p&gt;写时复制顾名思义，&lt;strong&gt;在发生写操作的时候，操作系统才会去复制物理内存&lt;/strong&gt;，这样是为了防止 fork 创建子进程时，由于物理内存数据的复制时间过长而导致父进程长时间阻塞的问题。&lt;/p&gt;
+&lt;h2 id=&#34;总结-1&#34;&gt;总结
+&lt;/h2&gt;&lt;p&gt;Redis 提供了三种将 AOF 日志写回硬盘的策略，分别是 Always、Everysec 和 No，这三种策略在可靠性上是从高到低，而在性能上则是从低到高。&lt;/p&gt;
+&lt;p&gt;随着执行的命令越多，AOF 文件的体积自然也会越来越大，为了避免日志文件过大， Redis 提供了 AOF 重写机制，它会直接扫描数据中所有的键值对数据，然后为每一个键值对生成一条写操作命令，接着将该命令写入到新的 AOF 文件，重写完成后，就替换掉现有的 AOF 日志。重写的过程是由后台子进程完成的，这样可以使得主进程可以继续正常处理命令。&lt;/p&gt;
+&lt;p&gt;用 AOF 日志的方式来恢复数据其实是很慢的，因为 Redis 执行命令由单线程负责的，而 AOF 日志恢复数据的方式是顺序执行日志里的每一条命令，如果 AOF 日志很大，这个「重放」的过程就会很慢了。&lt;/p&gt;
+</description>
+        </item>
+        
+    </channel>
+</rss>

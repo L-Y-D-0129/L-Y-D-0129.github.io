@@ -313,9 +313,7 @@
         </li>
       </ol>
     </li>
-  </ol>
-
-  <ol>
+    <li><a href="#redis数据结构">Redis数据结构</a></li>
     <li><a href="#键值对数据库是怎么实现的">键值对数据库是怎么实现的？</a></li>
     <li><a href="#sds">SDS</a>
       <ol>
@@ -425,6 +423,14 @@
         
             <a href="/categories/%E7%BC%93%E5%AD%98/" >
                 缓存
+            </a>
+        
+            <a href="/categories/%E6%8C%81%E4%B9%85%E5%8C%96/" >
+                持久化
+            </a>
+        
+            <a href="/categories/%E9%9B%86%E7%BE%A4/" >
+                集群
             </a>
         
     </header>
@@ -725,18 +731,8 @@
 <h4 id="电话姓名排序">电话、姓名排序
 </h4><p>使用有序集合的ZRANGEBYLEX或ZREVRANGEBYLEX可以帮助我们实现电话号码或姓名的排序，我们以(返回指定成员区间内的成员，按 key 正序排列，分数必须相同)为例。ZRANGEBYLEX</p>
 <p><strong>注意:不要在分数不一致的 SortSet 集合中去使用 ZRANGEBYLEX和 ZREVRANGEBYLEX 指令，因为获取的结果会不准确。</strong></p>
-<h1 id="redis数据结构">Redis数据结构
-</h1><p>这里主要讲解Redis键值对中值的数据类型，也就是数据的保存形式，其底层实现的方式的数据结构。</p>
-<p><img src="/image/%e6%95%b0%e6%8d%ae%e7%bb%93%e6%9e%84%e5%af%b9%e5%ba%94%e5%9b%be.png"
-	
-	
-	
-	loading="lazy"
-	
-		alt="数据结构对应图"
-	
-	
-></p>
+<h2 id="redis数据结构">Redis数据结构
+</h2><p>这里主要讲解Redis键值对中值的数据类型，也就是数据的保存形式，其底层实现的方式的数据结构。</p>
 <h2 id="键值对数据库是怎么实现的">键值对数据库是怎么实现的？
 </h2><p>Redis 是怎样实现键值对(key-value)数据库的。</p>
 <p>Redis 的键值对中的 key 就是字符串对象，而 <strong>value 可以是字符串对象，也可以是集合数据类型的对象</strong></p>
