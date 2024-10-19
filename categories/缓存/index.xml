@@ -1303,7 +1303,6 @@ Read View 有四个重要的字段：&lt;/br&gt;&lt;/p&gt;
 &lt;li&gt;min_trx_id ： 指在创建Read View 时，当前数据库中m_ids 列表中的id 最小的事务，也就是m_ids 的最小值&lt;/li&gt;
 &lt;li&gt;max_trx_id : 这个并不是m_ids的最大值，而是创建Read View 时当前数据库中给下一个id 值，也就是全局事务中的最大值 +1&lt;/li&gt;
 &lt;li&gt;creator_trx_id ： 指的时创建该Read View 的事务的事务id &lt;/br&gt;
-1729339809572.jpg
 &lt;img src = &#34;1729339809572.jpg&#34; alt=&#34;这是一张图片&#34;&gt;&lt;br /&gt;
 当使用InnoDB 存储引擎的数据库表，它的聚簇索引记录中包含下面两个隐藏列：&lt;br /&gt;&lt;/li&gt;
 &lt;li&gt;trx_id ，当一个事务对聚簇索引记录进行改动的时候，就会把该事务的id 记录在 trx_id 隐藏列里面&lt;/li&gt;
